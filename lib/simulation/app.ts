@@ -128,7 +128,9 @@ export class AppController {
     };
 
     // Listen for the custom event triggered by the UI button
-    window.addEventListener("triggerAftershock", this.handleAftershockEvent);
+    if (typeof window !== "undefined") {
+      window.addEventListener("triggerAftershock", this.handleAftershockEvent);
+    }
 
     this._init();
   }
@@ -179,7 +181,7 @@ export class AppController {
     const loop = (time: number) => {
       this.robots.forEach((robot) => {
         robot.update(this.world);
-        // If stuck, ask pathSimulator to compute route
+        // If stuck, ask pathSimulator to compute route via the Python AI Brain
         if (robot.stuckTicks > 10) {
           robot
             .pathSimulator!.computeRouteWithBackend(
@@ -302,7 +304,12 @@ export class AppController {
   }
 
   destroy() {
-    window.removeEventListener("triggerAftershock", this.handleAftershockEvent);
+    if (typeof window !== "undefined") {
+      window.removeEventListener(
+        "triggerAftershock",
+        this.handleAftershockEvent,
+      );
+    }
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     if (this.tickIntervalId) clearInterval(this.tickIntervalId);
   }
