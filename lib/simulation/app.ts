@@ -42,6 +42,9 @@ export class AppController {
   tickIntervalId: NodeJS.Timeout | null = null;
   missionSeconds = 0;
 
+  // Store the bound function so we can remove it later
+  private handleAftershockEvent = () => this.triggerAftershock();
+
   constructor(
     simCanvas: HTMLCanvasElement,
     neuralCanvas: HTMLCanvasElement | null,
@@ -67,7 +70,7 @@ export class AppController {
       this.neuralViz = new NeuralVisualizer(this.neuralCanvas);
     }
 
-    // Initialize clean state object instead of touching DOM
+    // Initialize clean state object
     this.state = {
       robot: { battery: 87, speed: 1.4, temperature: 42, cpu: 34 },
       mission: {
@@ -124,6 +127,9 @@ export class AppController {
       statusString: "Scanning systems...",
     };
 
+    // Listen for the custom event triggered by the UI button
+    window.addEventListener("triggerAftershock", this.handleAftershockEvent);
+
     this._init();
   }
 
@@ -141,6 +147,28 @@ export class AppController {
     this.state.alert = { text, level };
   }
 
+  triggerAftershock() {
+    this.addLog(
+      "CRITICAL: Aftershock detected! New debris falling.",
+      "critical",
+    );
+    this.setAlert("AFTERSHOCK: Rerouting all active robots", "critical");
+
+    // Drop 15 random obstacles onto the grid
+    for (let i = 0; i < 15; i++) {
+      const dropX = Math.floor(Utils.rand(5, this.world.cols - 5));
+      const dropY = Math.floor(Utils.rand(5, this.world.rows - 5));
+      this.world.avoidableObstacles.add(`${dropX},${dropY}`);
+    }
+
+    if (this.neuralViz) this.neuralViz.triggerPulse();
+
+    // Force robots to recalculate paths using the Backend immediately
+    this.robots.forEach((robot) => {
+      robot.stuckTicks = 100;
+    });
+  }
+
   _init() {
     this.addLog("NeuroRescue systems online — mission initiated", "success");
     this._recalculatePaths();
@@ -151,15 +179,24 @@ export class AppController {
     const loop = (time: number) => {
       this.robots.forEach((robot) => {
         robot.update(this.world);
+        // If stuck, ask pathSimulator to compute route
         if (robot.stuckTicks > 10) {
-          robot.pathSimulator!.computeRoute(
-            robot.x,
-            robot.y,
-            robot.robotIndex,
-            CONFIG.robotCount,
-          );
-          robot.setPath(robot.pathSimulator!.fullPath);
-          robot.stuckTicks = 0;
+          robot
+            .pathSimulator!.computeRouteWithBackend(
+              robot.x,
+              robot.y,
+              robot.pathSimulator!.targetSurvivor,
+            )
+            .then((confidence) => {
+              if (confidence) {
+                this.addLog(
+                  `Neural Backend Rerouted. Confidence: ${confidence}%`,
+                  "success",
+                );
+              }
+              robot.setPath(robot.pathSimulator!.waypoints);
+              robot.stuckTicks = 0;
+            });
         }
       });
 
@@ -173,13 +210,14 @@ export class AppController {
   _recalculatePaths() {
     const statusParts: string[] = [];
     this.robots.forEach((robot) => {
+      // Use local compute route initially, backend will take over if they get stuck or aftershock hits
       robot.pathSimulator!.computeRoute(
         robot.x,
         robot.y,
         robot.robotIndex,
         CONFIG.robotCount,
       );
-      robot.setPath(robot.pathSimulator!.fullPath);
+      robot.setPath(robot.pathSimulator!.waypoints);
       robot.stuckTicks = 0;
 
       const target = robot.pathSimulator!.targetSurvivor;
@@ -196,7 +234,6 @@ export class AppController {
   }
 
   _tick() {
-    // 1. Check for rescues
     let rescuedThisTick = false;
     this.robots.forEach((robot) => {
       const target = robot.pathSimulator!.targetSurvivor;
@@ -213,14 +250,13 @@ export class AppController {
 
     if (rescuedThisTick) this._recalculatePaths();
 
-    // 2. Update Telemetry State
     const totalAvoided = this.robots.reduce(
       (sum, r) => sum + r.obstaclesAvoided,
       0,
     );
     this.state.mission.obstaclesAvoided = totalAvoided;
 
-    // Simulating Telemetry updates (from your script.js TelemetryManager)
+    // Simulating Telemetry updates
     this.state.robot.battery = Utils.clamp(
       this.state.robot.battery - Utils.rand(0, 0.3),
       15,
@@ -266,6 +302,7 @@ export class AppController {
   }
 
   destroy() {
+    window.removeEventListener("triggerAftershock", this.handleAftershockEvent);
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     if (this.tickIntervalId) clearInterval(this.tickIntervalId);
   }
