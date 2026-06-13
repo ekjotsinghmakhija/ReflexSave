@@ -9,20 +9,32 @@ export default function MapPanel({ onStateUpdate }: { onStateUpdate: (state: any
 
     useEffect(() => {
         if (!canvasRef.current) return;
+        let isMounted = true;
 
-        // Initialize simulation
         if (!appRef.current) {
-            appRef.current = new AppController(canvasRef.current, null, onStateUpdate);
+            // Wait 50ms for Tailwind to apply styles so the canvas parent isn't 0x0
+            setTimeout(() => {
+                if (isMounted && canvasRef.current && !appRef.current) {
+                    appRef.current = new AppController(canvasRef.current, null, onStateUpdate);
+                }
+            }, 50);
         }
 
         return () => {
-            if (appRef.current) appRef.current.destroy();
+            isMounted = false;
+            if (appRef.current) {
+                appRef.current.destroy();
+                appRef.current = null; // CRITICAL FIX for React Strict Mode!
+            }
         };
-    }, [onStateUpdate]);
+        // Disable warning to prevent infinite re-renders from the parent state setter
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="relative w-full h-[500px] lg:h-[600px] p-2 bg-[#0a1018]">
-            <canvas ref={canvasRef} className="w-full h-full rounded-lg" />
+            {/* The canvas relies on this parent div for its size */}
+            <canvas ref={canvasRef} className="w-full h-full rounded-lg block" />
         </div>
     );
 }

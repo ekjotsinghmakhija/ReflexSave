@@ -8,9 +8,20 @@ export default function NeuralPanel({ logs }: { logs: any[] }) {
 
     useEffect(() => {
         if (!canvasRef.current) return;
+        let isMounted = true;
+
         if (!vizRef.current) {
-            vizRef.current = new NeuralVisualizer(canvasRef.current);
+            setTimeout(() => {
+                if (isMounted && canvasRef.current && !vizRef.current) {
+                    vizRef.current = new NeuralVisualizer(canvasRef.current);
+                }
+            }, 50);
         }
+
+        return () => {
+            isMounted = false;
+            vizRef.current = null; // CRITICAL FIX
+        };
     }, []);
 
     return (

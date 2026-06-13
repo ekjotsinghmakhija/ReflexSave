@@ -20,6 +20,9 @@ export class MapRenderer {
     this.ctx = canvas.getContext("2d")!;
     this.world = world;
     this.robots = robots;
+
+    // Bind resize listener so it redraws properly if browser changes size
+    window.addEventListener("resize", () => this.resize());
     this.resize();
   }
 
@@ -176,6 +179,8 @@ export class NeuralVisualizer {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
+
+    window.addEventListener("resize", () => this.resize());
     this._initNetwork();
     this.resize();
   }
