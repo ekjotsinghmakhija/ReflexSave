@@ -1,5 +1,4 @@
-// lib/simulation/renderers.ts
-import { CONFIG, OBSTACLE_SYMBOLS, Utils } from "./config";
+import { CONFIG, Utils } from "./config";
 import { World } from "./world";
 import { Robot } from "./entities";
 
@@ -21,7 +20,6 @@ export class MapRenderer {
     this.world = world;
     this.robots = robots;
 
-    // Bind resize listener so it redraws properly if browser changes size
     window.addEventListener("resize", () => this.resize());
     this.resize();
   }
@@ -46,6 +44,19 @@ export class MapRenderer {
     this.offsetY = (h - this.mapH) / 2;
     this.displayW = w;
     this.displayH = h;
+  }
+
+  screenToGrid(screenX: number, screenY: number) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (screenX * scaleX) / (window.devicePixelRatio || 1);
+    const y = (screenY * scaleY) / (window.devicePixelRatio || 1);
+
+    return {
+      gx: Math.floor((x - this.offsetX) / CONFIG.cellSize),
+      gy: Math.floor((y - this.offsetY) / CONFIG.cellSize),
+    };
   }
 
   toScreen(gx: number, gy: number) {
@@ -120,14 +131,12 @@ export class MapRenderer {
       ctx.translate(cx, cy);
       ctx.rotate(robot.angle);
 
-      // Robot Body
       ctx.fillStyle = "#2a3a50";
       ctx.fillRect(-s * 0.3, -s * 0.2, s * 0.6, s * 0.4);
       ctx.strokeStyle = robot.color;
       ctx.lineWidth = 2;
       ctx.strokeRect(-s * 0.3, -s * 0.2, s * 0.6, s * 0.4);
 
-      // Direction Indicator
       ctx.fillStyle = robot.color;
       ctx.beginPath();
       ctx.moveTo(s * 0.3, 0);
@@ -136,7 +145,6 @@ export class MapRenderer {
       ctx.fill();
       ctx.restore();
 
-      // Label
       ctx.fillStyle = robot.color;
       ctx.font = `bold ${Math.max(8, cs * 0.3)}px sans-serif`;
       ctx.textAlign = "center";
@@ -148,7 +156,6 @@ export class MapRenderer {
     const ctx = this.ctx;
     const cs = CONFIG.cellSize;
 
-    // Render dynamic debris
     Array.from(this.world.avoidableObstacles).forEach((obsKey) => {
       const [x, y] = obsKey.split(",").map(Number);
       const pos = this.toScreen(x, y);

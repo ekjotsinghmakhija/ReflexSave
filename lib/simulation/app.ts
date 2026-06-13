@@ -1,4 +1,3 @@
-// lib/simulation/app.ts
 import { CONFIG, ROBOT_DEFS, Utils } from "./config";
 import { World } from "./world";
 import { Robot, PathSimulator } from "./entities";
@@ -42,7 +41,6 @@ export class AppController {
   tickIntervalId: NodeJS.Timeout | null = null;
   missionSeconds = 0;
 
-  // Store the bound function so we can remove it later
   private handleAftershockEvent = () => this.triggerAftershock();
 
   constructor(
@@ -70,7 +68,6 @@ export class AppController {
       this.neuralViz = new NeuralVisualizer(this.neuralCanvas);
     }
 
-    // Initialize clean state object
     this.state = {
       robot: { battery: 87, speed: 1.4, temperature: 42, cpu: 34 },
       mission: {
@@ -127,7 +124,6 @@ export class AppController {
       statusString: "Scanning systems...",
     };
 
-    // Listen for the custom event triggered by the UI button
     if (typeof window !== "undefined") {
       window.addEventListener("triggerAftershock", this.handleAftershockEvent);
     }
@@ -156,7 +152,6 @@ export class AppController {
     );
     this.setAlert("AFTERSHOCK: Rerouting all active robots", "critical");
 
-    // Drop 15 random obstacles onto the grid
     for (let i = 0; i < 15; i++) {
       const dropX = Math.floor(Utils.rand(5, this.world.cols - 5));
       const dropY = Math.floor(Utils.rand(5, this.world.rows - 5));
@@ -165,23 +160,85 @@ export class AppController {
 
     if (this.neuralViz) this.neuralViz.triggerPulse();
 
-    // Force robots to recalculate paths using the Backend immediately
     this.robots.forEach((robot) => {
       robot.stuckTicks = 100;
     });
+  }
+
+  handleManualObstacle(screenX: number, screenY: number) {
+    const gridPos = this.mapRenderer.screenToGrid(screenX, screenY);
+    const key = `${gridPos.gx},${gridPos.gy}`;
+
+    if (
+      gridPos.gx < 0 ||
+      gridPos.gy < 0 ||
+      gridPos.gx >= this.world.cols ||
+      gridPos.gy >= this.world.rows
+    )
+      return;
+
+    this.world.avoidableObstacles.add(key);
+    this.addLog(
+      `God Mode: Debris dropped at [${gridPos.gx}, ${gridPos.gy}]`,
+      "critical",
+    );
+
+    if (this.neuralViz) this.neuralViz.triggerPulse();
+
+    let swarmReroute = false;
+    this.robots.forEach((robot) => {
+      if (!robot.path) return;
+      for (const wp of robot.path) {
+        if (
+          Math.floor(wp.x) === gridPos.gx &&
+          Math.floor(wp.y) === gridPos.gy
+        ) {
+          robot.stuckTicks = 100;
+          swarmReroute = true;
+          break;
+        }
+      }
+    });
+
+    if (swarmReroute) {
+      this.setAlert(
+        "SWARM ALERT: Path blocked. Synchronizing new routes...",
+        "warning",
+      );
+    }
+  }
+
+  async syncTelemetry() {
+    const complexity = Array.from(this.world.avoidableObstacles).length;
+    try {
+      const res = await fetch("http://localhost:8000/api/telemetry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          battery: this.state.robot.battery,
+          cpu: this.state.robot.cpu,
+          temperature: this.state.robot.temperature,
+          terrain_complexity: complexity > 50 ? 5 : 1,
+        }),
+      });
+      const data = await res.json();
+      this.state.robot.battery = data.battery;
+      this.state.robot.cpu = data.cpu;
+      this.state.robot.temperature = data.temperature;
+    } catch (e) {
+      // Silent fail
+    }
   }
 
   _init() {
     this.addLog("NeuroRescue systems online — mission initiated", "success");
     this._recalculatePaths();
 
-    // Start Loops
     this.tickIntervalId = setInterval(() => this._tick(), CONFIG.tickInterval);
 
     const loop = (time: number) => {
       this.robots.forEach((robot) => {
         robot.update(this.world);
-        // If stuck, ask pathSimulator to compute route via the Python AI Brain
         if (robot.stuckTicks > 10) {
           robot
             .pathSimulator!.computeRouteWithBackend(
@@ -212,7 +269,6 @@ export class AppController {
   _recalculatePaths() {
     const statusParts: string[] = [];
     this.robots.forEach((robot) => {
-      // Use local compute route initially, backend will take over if they get stuck or aftershock hits
       robot.pathSimulator!.computeRoute(
         robot.x,
         robot.y,
@@ -258,27 +314,7 @@ export class AppController {
     );
     this.state.mission.obstaclesAvoided = totalAvoided;
 
-    // Simulating Telemetry updates
-    this.state.robot.battery = Utils.clamp(
-      this.state.robot.battery - Utils.rand(0, 0.3),
-      15,
-      100,
-    );
-    this.state.robot.speed = Utils.clamp(
-      this.state.robot.speed + Utils.rand(-0.15, 0.15),
-      0.4,
-      2.2,
-    );
-    this.state.robot.temperature = Utils.clamp(
-      this.state.robot.temperature + Utils.rand(-1, 1.5),
-      35,
-      65,
-    );
-    this.state.robot.cpu = Utils.clamp(
-      this.state.robot.cpu + Utils.rand(-5, 8),
-      15,
-      95,
-    );
+    this.syncTelemetry();
 
     const pending = this.world.survivors.filter(
       (s) => !s.rescued && !s.abandoned,
@@ -299,7 +335,6 @@ export class AppController {
       (s) => s.zone === "critical",
     ).length;
 
-    // Broadcast state to React
     this.onStateUpdate({ ...this.state });
   }
 

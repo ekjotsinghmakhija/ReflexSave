@@ -16,9 +16,6 @@ export class PathSimulator {
     this.routeReachable = true;
   }
 
-  /**
-   * Synchronous local fallback routing
-   */
   computeRoute(
     robotX: number,
     robotY: number,
@@ -39,7 +36,6 @@ export class PathSimulator {
       return;
     }
 
-    // Priority: critical > risk > safe, then nearest
     const priority: Record<string, number> = { critical: 0, risk: 1, safe: 2 };
     active.sort((a, b) => {
       const pd = priority[a.zone] - priority[b.zone];
@@ -62,13 +58,9 @@ export class PathSimulator {
       pathEnd && Utils.dist(pathEnd.x, pathEnd.y, target.x, target.y) < 3;
   }
 
-  /**
-   * Asynchronous Backend Pathfinding
-   */
   async computeRouteWithBackend(robotX: number, robotY: number, target: any) {
     if (!target) return null;
 
-    // Package the current world state
     const payload = {
       cols: this.world.cols,
       rows: this.world.rows,
@@ -91,14 +83,17 @@ export class PathSimulator {
 
       if (data.status === "success") {
         this.fullPath = data.waypoints;
-        // Filter to every 2nd waypoint to allow smooth client-side interpolation
         this.waypoints = this.fullPath.filter(
           (_, i) => i % 2 === 0 || i === this.fullPath.length - 1,
         );
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("ai-metrics", { detail: data.metrics }),
+          );
+        }
         return data.confidence;
       } else {
-        console.warn("Backend Brain: No path found");
-        // Fallback to local routing if backend fails
         this.fullPath = this._buildVisualPath(
           robotX,
           robotY,
@@ -108,10 +103,6 @@ export class PathSimulator {
         return null;
       }
     } catch (error) {
-      console.error(
-        "Backend offline. Falling back to local TS heuristics.",
-        error,
-      );
       this.fullPath = this._buildVisualPath(robotX, robotY, target.x, target.y);
       return null;
     }
@@ -121,7 +112,6 @@ export class PathSimulator {
     const bfsPath = this.world.findPathBFS(sx, sy, tx, ty);
     if (bfsPath && bfsPath.length > 1) return bfsPath;
 
-    // Fallback: greedy detour path
     const path = [{ x: sx, y: sy }];
     let cx = sx;
     let cy = sy;
@@ -181,23 +171,6 @@ export class PathSimulator {
 
     const targetCell = this.world.findNearestWalkable(tx, ty);
     path.push({ x: targetCell.x, y: targetCell.y });
-    return path;
-  }
-
-  _nearestRoad(x: number, y: number) {
-    let best = null;
-    let bestD = Infinity;
-    for (const r of this.world.roads) {
-      const d = Utils.dist(x, y, r.x, r.y);
-      if (d < bestD) {
-        bestD = d;
-        best = r;
-      }
-    }
-    return best;
-  }
-
-  _smoothPath(path: any[]) {
     return path;
   }
 }
