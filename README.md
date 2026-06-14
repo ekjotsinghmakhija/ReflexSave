@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ReflexSave: Neuromorphic Swarm Rescue System
 
-## Getting Started
+> **Official Hackathon Submission: Disaster Zone Adaptive Navigation**
 
-First, run the development server:
+ReflexSave is a hybrid AI swarm simulation designed for dynamic disaster response. Powered by a **Next.js** frontend and a **PyTorch/FastAPI** backend, the system deploys a fleet of autonomous rescue robots that use neuromorphic terrain evaluation to navigate collapsed structures, dynamic ground cracks, and unpredictable aftershocks.
 
+## Core Features
+
+* **PyTorch Neuromorphic Backend:** A neural network (`NeuromorphicTerrainNet`) dynamically assigns traversal weights to terrain based on danger proximity and physical obstacle density.
+* **Swarm Intelligence:** Robots share pathing data in real-time. If one robot detects a blocked path, the entire swarm recalibrates instantly.
+* **Physics-Based Server Telemetry:** Battery drain, CPU load, and temperature aren't random—they are calculated server-side based on the physical terrain complexity the robots are crossing.
+* **"God Mode" Canvas Injection:** An interactive React canvas that allows users to click and drop concrete debris directly into a robot's path, triggering sub-50ms neural rerouting.
+* **Smart Hardware Fallback:** Engineered to detect next-gen GPU architectures (like the RTX 50-series Blackwell) and gracefully fallback to high-speed CPU tensors if the instruction set exceeds stable PyTorch kernels.
+
+## Technology Stack
+
+* **Frontend:** Next.js (App Router), React 18, Tailwind CSS v4, HTML5 Canvas API.
+* **Backend:** Python, FastAPI, Uvicorn.
+* **AI & Graph Engine:** PyTorch, NetworkX, NumPy.
+* **Testing:** Vitest (Frontend Engine), Pytest (Backend Telemetry & Routing).
+
+## How to Run Locally
+
+You will need two terminal windows to run the Hybrid Architecture.
+
+**1. Start the Neuromorphic Backend:**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**2. Start the Frontend Swarm Dashboard:**
+```bash
+npm install
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open `http://localhost:3000` in your browser.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Running the Test Suites
 
-## Learn More
+This project includes automated testing for both the physics engine and the AI routing.
 
-To learn more about Next.js, take a look at the following resources:
+* **Backend Tests:** `cd backend && python -m pytest test_main.py -v`
+* **Frontend Tests:** `npm test`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## System Architecture & Technical Highlights
 
-## Deploy on Vercel
+ReflexSave operates on a strictly decoupled, high-performance hybrid architecture designed to separate UI rendering from heavy tensor computations:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+* **Hybrid Execution Model:** The Next.js client acts purely as a 60FPS physics renderer and state manager. All complex pathfinding, swarm communication, and danger evaluation are offloaded to the Python FastAPI microservice.
+* **Deterministic Telemetry Engine:** Unlike standard UI simulations, robot telemetry is fully deterministic. The Python server calculates physical battery drain and CPU thermal throttling by evaluating the exact density of the terrain the robot is currently traversing.
+* **Adaptive Rerouting Latency:** The system is designed to handle sudden topological shifts (e.g., unexpected aftershocks). When dynamic debris is injected into the simulation, the PyTorch model evaluates the new terrain graph and propagates updated A* routing instructions back to the swarm in under 50 milliseconds.
+* **Intelligent Hardware Acceleration:** The backend features an autonomous hardware probe. It attempts to allocate VRAM on NVIDIA CUDA architectures by default, but utilizes a smart fallback mechanism to push tensors to the CPU if it detects an unsupported, bleeding-edge GPU architecture, ensuring zero runtime crashes during deployment.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Future Roadmap (Beyond the Hackathon)
+
+* **Real-World LiDAR Integration:** Connect the grid coordinate system to incoming point-cloud data from drone hardware.
+* **Reinforcement Learning:** Upgrade the NeuromorphicTerrainNet to a Deep Q-Network (DQN) that actively learns from robot battery depletion over time.
+* **Multi-Modal Sensor Fusion:** Incorporate real-time gas and thermal sensor mock-data directly into the pathfinding heuristic weights.
