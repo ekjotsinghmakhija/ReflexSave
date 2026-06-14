@@ -1,6 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+
 fastapi
 uvicorn
 numpy
 networkx
 pydantic
-torch
+torch==2.3.0+cu121
